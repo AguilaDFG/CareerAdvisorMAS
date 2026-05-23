@@ -1,0 +1,7 @@
+Coloca aquí el fichero jade.jar antes de ejecutar el proyecto.
+
+Descarga JADE desde: https://jade.tilab.com/
+  → Sección "Download" → "JADE 4.6.0" → jade.jar
+
+Una vez copiado, el proyecto compilará y ejecutará automáticamente
+al hacer doble clic en ejecutar.bat (Windows) o ejecutar.sh (macOS/Linux).

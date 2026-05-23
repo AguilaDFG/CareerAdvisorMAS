@@ -4,28 +4,24 @@ import jade.core.Agent;
 import jade.core.behaviours.CyclicBehaviour;
 import jade.domain.DFService;
 import jade.domain.FIPAException;
-import jade.domain.FIPAAgentManagement.DFAgentDescription;
-import jade.domain.FIPAAgentManagement.ServiceDescription;
+import jade.domain.FIPAAgentManagement.*;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 
 import es.upm.careeradvisor.gui.ResultadoGUI;
-import es.upm.careeradvisor.gui.ResultadoGUI.CarreraResultado;
 
 import javax.swing.SwingUtilities;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.regex.*;
 
 /**
- * Agente de Visualización (AgenteVisualizacion).
+ * AgenteVisualizacion
+ * ────────────────────
+ * Recibe el INFORM con el ranking global del AgenteCoordinador,
+ * lo parsea y lanza la GUI Swing. También imprime el ranking por consola.
  *
- * Responsabilidad: Recibe el resultado del ranking (mensaje INFORM con JSON),
- * lo parsea y lanza la interfaz gráfica Swing (ResultadoGUI) con los
- * resultados. También imprime un resumen por consola.
- *
- * Registra en el DF el servicio "visualizacion-resultados".
- * Implementa filtro de mensajes bloqueante (receive + block).
+ * Servicio DF : "visualizacion-resultados"
+ * Ontología   : "career-advisor"
  */
 public class AgenteVisualizacion extends Agent {
 
@@ -33,174 +29,139 @@ public class AgenteVisualizacion extends Agent {
 
     @Override
     protected void setup() {
-        System.out.println("[AgenteVisualizacion] Iniciando agente: " + getLocalName());
-        registrarEnDF();
-        addBehaviour(new MostrarResultadosBehaviour());
+        System.out.println("[Visualizacion] Iniciando: " + getLocalName());
+        registrarDF();
+        addBehaviour(new MostrarBehaviour());
     }
 
     @Override
     protected void takeDown() {
-        try {
-            DFService.deregister(this);
-        } catch (FIPAException e) {
-            System.err.println("[AgenteVisualizacion] Error al desregistrarse del DF: " + e.getMessage());
-        }
-        System.out.println("[AgenteVisualizacion] Agente finalizado.");
+        try { DFService.deregister(this); } catch (FIPAException ignored) {}
+        System.out.println("[Visualizacion] Finalizado.");
     }
 
-    // -------------------------------------------------------------------------
-    // Registro en el DF
-    // -------------------------------------------------------------------------
-    private void registrarEnDF() {
+    private void registrarDF() {
         try {
             DFAgentDescription dfd = new DFAgentDescription();
             dfd.setName(getAID());
             ServiceDescription sd = new ServiceDescription();
             sd.setType(SERVICE_TYPE);
             sd.setName(SERVICE_TYPE);
-            sd.addOntologies("career-advisor-ontology");
             dfd.addServices(sd);
             DFService.register(this, dfd);
-            System.out.println("[AgenteVisualizacion] Registrado en DF con servicio: " + SERVICE_TYPE);
+            System.out.println("[Visualizacion] Registrado en DF: " + SERVICE_TYPE);
         } catch (FIPAException e) {
-            System.err.println("[AgenteVisualizacion] Error al registrarse en el DF: " + e.getMessage());
+            System.err.println("[Visualizacion] Error DF: " + e.getMessage());
             doDelete();
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Behaviour cíclico con filtro bloqueante: espera mensajes INFORM
-    // -------------------------------------------------------------------------
-    private class MostrarResultadosBehaviour extends CyclicBehaviour {
+    // ── Behaviour cíclico con filtro bloqueante ──────────────────────────
+    private class MostrarBehaviour extends CyclicBehaviour {
 
-        // Filtro: solo mensajes ACL de tipo INFORM con la ontología correcta
-        private final MessageTemplate filtro = MessageTemplate.and(
+        private final MessageTemplate MT = MessageTemplate.and(
             MessageTemplate.MatchPerformative(ACLMessage.INFORM),
-            MessageTemplate.MatchOntology("career-advisor-ontology")
+            MessageTemplate.MatchOntology("career-advisor")
         );
 
         @Override
         public void action() {
-            // Recepción NO bloqueante + block() — filtro en modo bloqueante
-            ACLMessage msg = myAgent.receive(filtro);
-
+            ACLMessage msg = myAgent.receive(MT);
             if (msg != null) {
-                System.out.println("[AgenteVisualizacion] Mensaje INFORM recibido de: "
+                System.out.println("[Visualizacion] INFORM recibido de: "
                     + msg.getSender().getLocalName());
-
-                String jsonContent = msg.getContent();
-                ResultadoParsed resultado = parsearJSON(jsonContent);
-
-                if (resultado == null) {
-                    System.err.println("[AgenteVisualizacion] Error parseando el resultado JSON.");
-                    return;
+                ResultadoParsed r = parsear(msg.getContent());
+                if (r != null) {
+                    mostrarConsola(r);
+                    SwingUtilities.invokeLater(() -> new ResultadoGUI(r));
                 }
-
-                // Mostrar por consola
-                mostrarConsola(resultado);
-
-                // Lanzar GUI en el hilo de Swing (EDT)
-                final ResultadoParsed r = resultado;
-                SwingUtilities.invokeLater(() -> {
-                    new ResultadoGUI(r.intereses, r.ranking);
-                });
-
             } else {
-                // Sin mensaje — bloquear este behaviour hasta que llegue uno nuevo
                 block();
             }
         }
 
-        // -----------------------------------------------------------------------
-        // Parser JSON ligero (sin dependencias externas)
-        // -----------------------------------------------------------------------
-        private ResultadoParsed parsearJSON(String json) {
+        // ── Parser JSON ligero ────────────────────────────────────────
+        private ResultadoParsed parsear(String json) {
             try {
                 ResultadoParsed r = new ResultadoParsed();
 
-                // Extraer campo "intereses"
-                Pattern pIntereses = Pattern.compile("\"intereses\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
-                Matcher mIntereses = pIntereses.matcher(json);
-                r.intereses = mIntereses.find() ? unescapeJson(mIntereses.group(1)) : "(desconocido)";
+                r.intereses    = extraerCampo(json, "intereses");
+                r.desintereses = extraerCampo(json, "desintereses");
+                r.winnerDomain = extraerCampo(json, "winner_domain");
+                r.careers      = new ArrayList<>();
 
-                Pattern pDesint = Pattern.compile("\"desintereses\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
-                Matcher mDesint = pDesint.matcher(json);
-                r.desintereses = mDesint.find() ? unescapeJson(mDesint.group(1)) : "";
-
-                // Extraer array "ranking"
-                Pattern pItem = Pattern.compile(
-                    "\\{\\s*\"nombre\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\""
-                    + "\\s*,\\s*\"emoji\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\""
-                    + "\\s*,\\s*\"descripcion\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\""
-                    + "\\s*,\\s*\"score\"\\s*:\\s*([\\d.]+)"
-                    + "\\s*,\\s*\"keywords_matched\"\\s*:\\s*(\\d+)"
-                    + "\\s*,\\s*\"keywords_penalty\"\\s*:\\s*(\\d+)"
-                    + "\\s*\\}"
+                Pattern p = Pattern.compile(
+                    "\\{\"nombre\":\"((?:[^\"\\\\]|\\\\.)*)\","
+                    + "\"emoji\":\"((?:[^\"\\\\]|\\\\.)*)\","
+                    + "\"descripcion\":\"((?:[^\"\\\\]|\\\\.)*)\","
+                    + "\"score\":([\\-\\d.]+),"
+                    + "\"positive\":(\\d+),"
+                    + "\"negative\":(\\d+),"
+                    + "\"domain\":\"((?:[^\"\\\\]|\\\\.)*)\","
+                    + "\"winner\":(true|false)\\}"
                 );
-                Matcher mItem = pItem.matcher(json);
-                r.ranking = new ArrayList<>();
-                while (mItem.find()) {
-                    long penalty = mItem.groupCount() >= 6
-                        ? Long.parseLong(mItem.group(6)) : 0L;
-                    r.ranking.add(new CarreraResultado(
-                        unescapeJson(mItem.group(1)),
-                        unescapeJson(mItem.group(2)),
-                        unescapeJson(mItem.group(3)),
-                        Double.parseDouble(mItem.group(4)),
-                        Long.parseLong(mItem.group(5)),
-                        penalty
-                    ));
+                Matcher m = p.matcher(json);
+                while (m.find()) {
+                    ResultadoGUI.CarreraResultado c = new ResultadoGUI.CarreraResultado(
+                        unesc(m.group(1)), unesc(m.group(2)), unesc(m.group(3)),
+                        Double.parseDouble(m.group(4)),
+                        Long.parseLong(m.group(5)), Long.parseLong(m.group(6)),
+                        unesc(m.group(7)), Boolean.parseBoolean(m.group(8))
+                    );
+                    r.careers.add(c);
                 }
                 return r;
             } catch (Exception e) {
-                System.err.println("[AgenteVisualizacion] Excepción al parsear JSON: " + e.getMessage());
+                System.err.println("[Visualizacion] Error parseando JSON: " + e.getMessage());
                 return null;
             }
         }
 
-        private String unescapeJson(String s) {
-            return s.replace("\\\"", "\"")
-                    .replace("\\\\", "\\")
-                    .replace("\\n", "\n")
-                    .replace("\\r", "\r");
+        private String extraerCampo(String json, String campo) {
+            Matcher m = Pattern.compile("\"" + campo + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+                               .matcher(json);
+            return m.find() ? unesc(m.group(1)) : "";
         }
 
-        // -----------------------------------------------------------------------
-        // Salida por consola
-        // -----------------------------------------------------------------------
+        private String unesc(String s) {
+            return s.replace("\\\"", "\"").replace("\\\\", "\\")
+                    .replace("\\n", "\n").replace("\\r", "\r");
+        }
+
+        // ── Consola ───────────────────────────────────────────────────
         private void mostrarConsola(ResultadoParsed r) {
             System.out.println();
             System.out.println("╔══════════════════════════════════════════════════════════╗");
-            System.out.println("║          CARREERADVISOR MAS — RESULTADOS                 ║");
+            System.out.println("║        CARREERADVISOR MAS — RANKING GLOBAL               ║");
             System.out.println("╠══════════════════════════════════════════════════════════╣");
-            System.out.println("║ Intereses:    " + truncar(r.intereses,    45));
-            if (r.desintereses != null && !r.desintereses.isEmpty()) {
-                System.out.println("║ Desintereses: " + truncar(r.desintereses, 45));
-            }
+            System.out.println("║ Intereses:    " + trunc(r.intereses, 45));
+            if (!r.desintereses.isEmpty())
+                System.out.println("║ Desintereses: " + trunc(r.desintereses, 45));
             System.out.println("╠══════════════════════════════════════════════════════════╣");
-            String[] medals = {"🥇", "🥈", "🥉", " 4.", " 5."};
-            for (int i = 0; i < r.ranking.size(); i++) {
-                CarreraResultado c = r.ranking.get(i);
-                String medal = i < 3 ? medals[i] : medals[i];
-                System.out.printf("║ %s %-30s %5.1f%%  (%2d kw)%n",
-                    medal, truncar(c.nombre, 30), c.score * 100, c.keywordsMatched);
+            String[] med = {"🥇","🥈","🥉"," 4."," 5."," 6."," 7."," 8."," 9.","10."};
+            for (int i = 0; i < r.careers.size(); i++) {
+                ResultadoGUI.CarreraResultado c = r.careers.get(i);
+                System.out.printf("║ %s %-28s %5.1f%%  +%d/-%d  [%s]%n",
+                    i < med.length ? med[i] : "  ",
+                    trunc(c.nombre, 28), c.score * 100,
+                    c.positive, c.negative,
+                    trunc(c.domain, 12));
             }
             System.out.println("╚══════════════════════════════════════════════════════════╝");
             System.out.println();
         }
 
-        private String truncar(String s, int max) {
+        private String trunc(String s, int max) {
             if (s == null) return "";
             return s.length() <= max ? s : s.substring(0, max - 3) + "...";
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Estructura auxiliar para el resultado parseado
-    // -------------------------------------------------------------------------
-    static class ResultadoParsed {
-        String intereses;
-        String desintereses;
-        List<CarreraResultado> ranking;
+    // ── Estructura de datos del resultado parseado ───────────────────────
+    public static class ResultadoParsed {
+        public String intereses;
+        public String desintereses;
+        public String winnerDomain;
+        public List<ResultadoGUI.CarreraResultado> careers;
     }
 }
