@@ -3,7 +3,8 @@
 **Sistema multiagente para la recomendación de carreras universitarias basado en intereses personales**
 
 > Práctica de Sistemas Inteligentes — UPM ETSII 2025–26  
-> Plataforma: **JADE** (Java Agent DEvelopment Framework)
+> Plataforma: **JADE** (Java Agent DEvelopment Framework)  
+> Protocolo de interacción: **FIPA Contract-Net**
 
 ---
 
@@ -11,218 +12,246 @@
 
 1. [Descripción del sistema](#descripción-del-sistema)
 2. [Arquitectura](#arquitectura)
-3. [Requisitos](#requisitos)
-4. [Instalación](#instalación)
+3. [Agentes y mensajes ACL](#agentes-y-mensajes-acl)
+4. [Requisitos e instalación](#requisitos-e-instalación)
 5. [Ejecución](#ejecución)
 6. [Datos de ejemplo](#datos-de-ejemplo)
-7. [Flujo de mensajes ACL](#flujo-de-mensajes-acl)
-8. [Estructura del proyecto](#estructura-del-proyecto)
-9. [Declaración de IA](#declaración-de-ia)
-10. [Modo de Trabajo](#modo-de-trabajo)
+7. [Declaración de IA](#declaración-de-ia)
 
 ---
 
 ## Descripción del sistema
 
-CareerAdvisor-MAS es un **sistema multiagente** que analiza los intereses personales del usuario (expresados en lenguaje natural) y recomienda las carreras universitarias o formaciones profesionales más adecuadas. Es una demo con 15 carreras, pero se podrían añadir todas las que se quisieran
-
-El sistema consta de **tres agentes especializados** que colaboran intercambiando mensajes ACL y se localizan dinámicamente a través del **Directory Facilitator (DF)** de JADE. Es un modelo sencillo bassado en palabras clave para la recomendación.
+CareerAdvisor-MAS analiza los intereses personales del usuario (en lenguaje natural) y recomienda las carreras universitarias más adecuadas. El sistema está construido sobre JADE e implementa el **protocolo FIPA Contract-Net** para que múltiples agentes especializados en distintos dominios de conocimiento compitan para aportar la mejor recomendación.
 
 ---
 
 ## Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Plataforma JADE (Main Container)             │
-│                                                                 │
-│  ┌──────────────────┐   ACL REQUEST    ┌──────────────────────┐ │
-│  │                  │ ───────────────► │                      │ │
-│  │ AgentePercepcion │                  │  AgenteConocimiento  │ │
-│  │                  │                  │                      │ │
-│  │  • Lee fichero   │                  │  • Base conocimiento │ │
-│  │  • Diálogo Swing │                  │  • Ranking carreras  │ │
-│  │  • Busca en DF   │                  │  • Calcula scores    │ │
-│  └──────────────────┘                  └──────────┬───────────┘ │
-│                                                   │             │
-│                                        ACL INFORM │             │
-│                                                   ▼             │
-│                                        ┌──────────────────────┐ │
-│                                        │  AgenteVisualizacion │ │
-│                                        │                      │ │
-│                                        │  • Parsea resultado  │ │
-│                                        │  • GUI Swing         │ │
-│                                        │  • Salida consola    │ │
-│                                        └──────────────────────┘ │
-│                                                                 │
-│  ┌───────────┐   ┌───────────────────────────────────────────┐  │
-│  │    DF     │   │  Servicios registrados:                   │  │
-│  │ (Yellow   │   │  • percepcion-intereses (AgentePercepcion)│  │
-│  │  Pages)   │   │  • procesamiento-carreras (AgenteConoc.)  │  │
-│  │           │   │  • visualizacion-resultados (AgenteViz.)  │  │
-│  └───────────┘   └───────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Plataforma JADE                                  │
+│  ┌────────────────────┐  REQUEST(intereses+desintereses)                │
+│  │  AgentePercepcion  │ ─────────────────────────────────►              │
+│  │                    │                                                  │
+│  │  • Lee ficheros    │          ┌─────────────────────────┐            │
+│  │    intereses.txt   │          │    AgenteCoordinador    │            │
+│  │    desintereses.txt│          │  (Contract-Net          │            │
+│  │  • Diálogo Swing   │          │   INICIADOR)            │            │
+│  └────────────────────┘          └──┬──────────────────────┘            │
+│                                     │                                   │
+│          CFP (intereses+desintereses)│ → broadcast a todos los KB       │
+│            ┌────────────────────────┼──────────────────┐               │
+│            ▼                        ▼                   ▼               │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │
+│  │ AgenteKB         │  │ AgenteKB         │  │ AgenteKB         │      │
+│  │ _tecnologia      │  │ _ciencias        │  │ _humanidades     │      │
+│  │ (PARTICIPANTE)   │  │ (PARTICIPANTE)   │  │ (PARTICIPANTE)   │      │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘      │
+│           │  PROPOSE/REFUSE     │                      │                │
+│  ┌──────────────────┐           │                      │               │
+│  │ AgenteKB         │           │                      │               │
+│  │ _salud           │           │                      │               │
+│  └────────┬─────────┘           │                      │               │
+│  ┌──────────────────┐           │                      │               │
+│  │ AgenteKB         │           │                      │               │
+│  │ _arte            │           │                      │               │
+│  └────────┬─────────┘           │                      │               │
+│           └─────────────────────┘──────────────────────┘               │
+│                  PROPOSE(ranking JSON del dominio)                      │
+│                             │                                           │
+│          AgenteCoordinador  │                                           │
+│          • Elige KB ganador │                                           │
+│          • ACCEPT_PROPOSAL  → KB ganador  → INFORM (confirmación)      │
+│          • REJECT_PROPOSAL  → resto de KB                              │
+│          • Agrega ranking global                                        │
+│                             │  INFORM(ranking global JSON)             │
+│                             ▼                                           │
+│                  ┌──────────────────────┐                              │
+│                  │  AgenteVisualizacion │                              │
+│                  │  • GUI Swing         │                              │
+│                  │  • Salida consola    │                              │
+│                  └──────────────────────┘                              │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  Directory Facilitator (DF)  — servicios registrados:           │   │
+│  │  percepcion-intereses · coordinador-carreras                    │   │
+│  │  kb-domain-tecnologia · kb-domain-ciencias · kb-domain-salud    │   │
+│  │  kb-domain-humanidades · kb-domain-arte · visualizacion-res.    │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Agentes
+---
 
-| Agente | Tipo | Comportamiento JADE | Servicio DF |
-|--------|------|---------------------|-------------|
-| `AgentePercepcion` | Percepción/Adquisición | `OneShotBehaviour` | `percepcion-intereses` |
-| `AgenteConocimiento` | Procesamiento/Inteligencia | `CyclicBehaviour` + filtro bloqueante | `procesamiento-carreras` |
-| `AgenteVisualizacion` | Visualización UI | `CyclicBehaviour` + filtro bloqueante | `visualizacion-resultados` |
+## Agentes y mensajes ACL
+
+### Agentes del sistema
+
+| Agente | Rol | Behaviour JADE | Servicio DF |
+|--------|-----|---------------|-------------|
+| `AgentePercepcion` | Percepción / adquisición | `OneShotBehaviour` | `percepcion-intereses` |
+| `AgenteCoordinador` | Coordinación Contract-Net (iniciador) | `Behaviour` (máquina de estados) | `coordinador-carreras` |
+| `AgenteKB_tecnologia` | Base de conocimiento — Tecnología | `CyclicBehaviour` | `kb-domain-tecnologia` |
+| `AgenteKB_ciencias` | Base de conocimiento — Ciencias | `CyclicBehaviour` | `kb-domain-ciencias` |
+| `AgenteKB_humanidades` | Base de conocimiento — Humanidades | `CyclicBehaviour` | `kb-domain-humanidades` |
+| `AgenteKB_salud` | Base de conocimiento — Salud | `CyclicBehaviour` | `kb-domain-salud` |
+| `AgenteKB_arte` | Base de conocimiento — Arte | `CyclicBehaviour` | `kb-domain-arte` |
+| `AgenteVisualizacion` | Visualización / interfaz | `CyclicBehaviour` | `visualizacion-resultados` |
+
+### Flujo de mensajes ACL
+
+```
+AgentePercepcion
+  │  REQUEST  (ontology=career-advisor, content=intereses||DESINTERESES||desintereses)
+  ▼
+AgenteCoordinador
+  │  CFP  × 5  (broadcast a todos los AgenteKB)
+  ▼
+AgenteKB_*  →  PROPOSE(ranking JSON del dominio)  o  REFUSE
+  ▼
+AgenteCoordinador
+  │  ACCEPT_PROPOSAL → KB ganador
+  │  REJECT_PROPOSAL → resto
+  ▼
+AgenteKB ganador  →  INFORM (confirmación)
+  ▼
+AgenteCoordinador
+  │  INFORM (ranking global JSON, top-10 carreras)
+  ▼
+AgenteVisualizacion  →  GUI Swing + consola
+```
+
+**Filtros de mensajes bloqueantes** implementados en todos los agentes receptores:
+
+```java
+// AgenteCoordinador — espera REQUEST
+MessageTemplate.and(MatchPerformative(REQUEST), MatchOntology("career-advisor"))
+
+// AgenteKB — espera CFP / ACCEPT / REJECT
+MessageTemplate.and(MatchPerformative(CFP),             MatchOntology("career-advisor"))
+MessageTemplate.and(MatchPerformative(ACCEPT_PROPOSAL), MatchOntology("career-advisor"))
+MessageTemplate.and(MatchPerformative(REJECT_PROPOSAL), MatchOntology("career-advisor"))
+
+// AgenteVisualizacion — espera INFORM
+MessageTemplate.and(MatchPerformative(INFORM), MatchOntology("career-advisor"))
+```
+
+Todos usan el patrón `receive(filtro) + block()` para espera eficiente sin polling activo.
 
 ---
 
-## Requisitos
+## Requisitos e instalación
 
-- **Java** 8 o superior (JDK)
-- **JADE** 4.5+ (`jade.jar`) — [descargar en jade.tilab.com](https://jade.tilab.com/)
-- **Eclipse IDE** (recomendado) o cualquier IDE Java
-- Sistema operativo: Windows / macOS / Linux
+### Dependencias
 
----
+| Herramienta | Versión mínima | Enlace |
+|-------------|---------------|--------|
+| Java JDK    | 8             | https://adoptium.net/ |
+| JADE        | 4.5           | https://jade.tilab.com/ |
+| Eclipse IDE | 2022-06+      | https://www.eclipse.org/ (opcional) |
 
-## Instalación
+### Pasos
 
-### 1. Clonar el repositorio
-
+**1. Clonar el repositorio**
 ```bash
-git clone https://https://github.com/AguilaDFG/CareerAdvisorMAS.git
+git clone https://github.com/<usuario>/CareerAdvisorMAS.git
 cd CareerAdvisorMAS
 ```
 
-### 2. Obtener JADE
+**2. Obtener jade.jar**
 
-Descarga `jade.jar` desde https://jade.tilab.com/ y colócalo en la carpeta `lib/`:
-
+Descarga `jade.jar` desde https://jade.tilab.com/ y colócalo en:
 ```
-CareerAdvisorMAS/
-└── lib/
-    └── jade.jar      ← aquí
+CareerAdvisorMAS/lib/jade.jar
 ```
 
-### 3. Importar en Eclipse
+**3. (Opcional) Importar en Eclipse**
 
-1. `File → Import → Existing Projects into Workspace`
-2. Selecciona la carpeta `CareerAdvisorMAS`
-3. Eclipse detectará `.classpath` y `.project` automáticamente
-4. Comprueba que `lib/jade.jar` aparece en el Build Path
-
-### 4. Compilar
-
-Eclipse compila automáticamente. Si usas línea de comandos:
-
-```bash
-mkdir -p bin
-javac -cp lib/jade.jar -d bin \
-  src/es/upm/careeradvisor/knowledge/CareerKnowledgeBase.java \
-  src/es/upm/careeradvisor/gui/ResultadoGUI.java \
-  src/es/upm/careeradvisor/agents/AgenteVisualizacion.java \
-  src/es/upm/careeradvisor/agents/AgenteConocimiento.java \
-  src/es/upm/careeradvisor/agents/AgentePercepcion.java \
-  src/es/upm/careeradvisor/MainLauncher.java
-```
+`File → Import → Existing Projects into Workspace` → selecciona la carpeta del proyecto.  
+Eclipse detecta `.classpath` y `.project` automáticamente.
 
 ---
 
 ## Ejecución
 
-### Opción A — Eclipse (recomendado)
+### Opción A — Doble clic (recomendada)
 
-1. Clic derecho en `MainLauncher.java` → `Run As → Java Application`
-2. O bien importa `CareerAdvisorMAS.launch` y ejecuta directamente
+| SO | Fichero |
+|----|---------|
+| Windows | `ejecutar.bat` |
+| macOS / Linux | `ejecutar.sh` |
 
-### Opción B — Línea de comandos
+El script compila automáticamente la primera vez y arranca la plataforma JADE.
+
+### Opción B — Eclipse
+
+Clic derecho en `MainLauncher.java` → `Run As → Java Application`  
+O bien importa `CareerAdvisorMAS.launch` y ejecuta directamente.
+
+### Opción C — Línea de comandos
 
 ```bash
-java -cp bin:lib/jade.jar es.upm.careeradvisor.MainLauncher
-# Windows:
-java -cp "bin;lib/jade.jar" es.upm.careeradvisor.MainLauncher
-```
+# Compilar
+mkdir -p bin
+find src -name "*.java" > /tmp/sources.txt
+javac -encoding UTF-8 -cp lib/jade.jar -d bin @/tmp/sources.txt
 
-### Opción C — JADE Boot directo
-
-```bash
-java -cp "bin;lib/jade.jar" jade.Boot \
-  -gui \
-  agenteVisualizacion:es.upm.careeradvisor.agents.AgenteVisualizacion \
-  agenteConocimiento:es.upm.careeradvisor.agents.AgenteConocimiento \
-  agentePercepcion:es.upm.careeradvisor.agents.AgentePercepcion
+# Ejecutar
+java -cp "bin:lib/jade.jar" es.upm.careeradvisor.MainLauncher
+# Windows: java -cp "bin;lib/jade.jar" es.upm.careeradvisor.MainLauncher
 ```
 
 ### Flujo de uso
 
-1. Se abre la GUI de JADE (RMA) y se inician los tres agentes.
-2. Si existen `resources/intereses.txt` y `resources/desintereses.txt`, se usan sus contenidos directamente.
-3. Si no existe, aparece un **diálogo Swing** para introducir tus intereses.
-4. Tras unos instantes, se abre la **ventana de resultados** con el ranking de carreras.
+1. Se abre la GUI de JADE (RMA) y se crean los 8 agentes.
+2. Si existen `resources/intereses.txt` y `resources/desintereses.txt`, se usan directamente.
+3. Si no existen, aparecen **dos diálogos Swing** consecutivos para introducir texto libre.
+4. El sistema ejecuta el protocolo Contract-Net entre los 5 agentes KB.
+5. Se abre la **ventana de resultados** con el ranking de carreras y sus puntuaciones.
 
 ---
 
 ## Datos de ejemplo
 
-Los ficheros `resources/intereses.txt` y `resources/desintereses.txt` contienen un ejemplo:
-
+**`resources/intereses.txt`**
 ```
-Me encanta la programación y resolver problemas lógicos con algoritmos.
+Me encanta programar y resolver problemas lógicos con algoritmos.
 Disfruto creando aplicaciones web y explorando la inteligencia artificial.
 También me gustan las matemáticas, los videojuegos y la seguridad informática.
 En mi tiempo libre aprendo sobre redes neuronales y bases de datos.
 ```
 
-**Resultado esperado:**
+**`resources/desintereses.txt`**
+```
+No me gusta la biología ni trabajar con pacientes o en hospitales.
+Tampoco me atrae el derecho, la política ni los procesos judiciales.
+```
 
+**Salida esperada en consola:**
 ```
 ╔══════════════════════════════════════════════════════════╗
-║          CARREERADVISOR MAS — RESULTADOS                 ║
+║        CARREERADVISOR MAS — RANKING GLOBAL               ║
 ╠══════════════════════════════════════════════════════════╣
-║ Intereses: Me encanta la programación y resolver probl...
+║ Intereses:    Me encanta programar y resolver problem...
+║ Desintereses: No me gusta la biología ni trabajar co...
 ╠══════════════════════════════════════════════════════════╣
-║ 🥇 Ingeniería Informática            24.1%  (7 kw)
-║ 🥈 Matemáticas                        8.6%  (2 kw)
-║ 🥉 Ingeniería de Telecomunicaciones   6.9%  (2 kw)
-║  4. Administración de Empresas (ADE)  3.4%  (1 kw)
-║  5. Biología                          3.4%  (1 kw)
+║ 🥇 Ingeniería Informática       24.1%  +7/-0  [tecnologia]
+║ 🥈 Matemáticas                   8.6%  +2/-0  [tecnologia]
+║ 🥉 Ing. Telecomunicaciones       6.9%  +2/-0  [tecnologia]
+║  4. Diseño Gráfico               3.4%  +1/-0  [arte]
+║  5. Administración Empresas      3.4%  +1/-0  [humanidades]
 ╚══════════════════════════════════════════════════════════╝
 ```
 
-Otros ejemplos de intereses para probar:
+Otros perfiles de prueba:
 
-- *Medicina*: `"Me apasiona la biología, la salud humana y ayudar a los pacientes"`
-- *Arte*: `"Me encanta pintar, dibujar y la fotografía artística"`
-- *Derecho*: `"Me interesa la justicia, las leyes y los derechos humanos"`
-- *Psicología*: `"Me fascina la mente humana, las emociones y la terapia"`
-
----
-
-## Flujo de mensajes ACL
-
-```
-AgentePercepcion                AgenteConocimiento          AgenteVisualizacion
-      │                                 │                            │
-      │  [consulta DF: procesamiento]   │                            │
-      │ ──────────────────────────────► │ (DF responde con AID)      │
-      │                                 │                            │
-      │  REQUEST (ontology=career-adv.) │                            │
-      │  content: "intereses del user"  │                            │
-      │ ──────────────────────────────► │                            │
-      │                                 │ [calcula ranking]          │
-      │                                 │ [consulta DF: visualiz.]   │
-      │                                 │ ──────────────────────────►│(DF responde)
-      │                                 │                            │
-      │                                 │  INFORM (ontology=career.) │
-      │                                 │  content: JSON con ranking │
-      │                                 │ ──────────────────────────►│
-      │                                 │                            │ [muestra GUI]
-```
-
-**Filtros de mensajes implementados:**
-
-- `AgenteConocimiento`: `MessageTemplate.and(MatchPerformative(REQUEST), MatchOntology("career-advisor-ontology"))`
-- `AgenteVisualizacion`: `MessageTemplate.and(MatchPerformative(INFORM), MatchOntology("career-advisor-ontology"))`
-
-Ambos usan el patrón `receive(filtro) + block()` para espera eficiente sin polling activo.
+| Intereses | Carrera esperada |
+|-----------|-----------------|
+| `biología, naturaleza, ecosistemas, animales` | Biología (Ciencias) |
+| `pintar, dibujar, arte, creatividad, diseño` | Bellas Artes (Arte) |
+| `salud, cuidar, pacientes, medicina, urgencias` | Medicina / Enfermería (Salud) |
+| `ley, justicia, derechos humanos, argumentar` | Derecho (Humanidades) |
 
 ---
 
@@ -230,25 +259,26 @@ Ambos usan el patrón `receive(filtro) + block()` para espera eficiente sin poll
 
 ```
 CareerAdvisorMAS/
-├── src/
-│   └── es/upm/careeradvisor/
-│       ├── MainLauncher.java                  # Punto de entrada
-│       ├── agents/
-│       │   ├── AgentePercepcion.java          # Agente de percepción
-│       │   ├── AgenteConocimiento.java        # Agente de procesamiento
-│       │   └── AgenteVisualizacion.java       # Agente de visualización
-│       ├── knowledge/
-│       │   └── CareerKnowledgeBase.java       # Base de conocimiento (15 carreras)
-│       └── gui/
-│           └── ResultadoGUI.java              # Interfaz gráfica Swing
+├── src/es/upm/careeradvisor/
+│   ├── MainLauncher.java                  # Punto de entrada JADE
+│   ├── agents/
+│   │   ├── AgentePercepcion.java          # Percepción (OneShotBehaviour)
+│   │   ├── AgenteCoordinador.java         # Contract-Net iniciador
+│   │   ├── AgenteKB.java                  # KB especializado (5 instancias)
+│   │   └── AgenteVisualizacion.java       # Visualización (CyclicBehaviour)
+│   ├── knowledge/
+│   │   └── KnowledgeDomain.java           # Base de conocimiento (5 dominios, 20 carreras)
+│   └── gui/
+│       └── ResultadoGUI.java              # Interfaz Swing con ranking
 ├── resources/
-│   └── intereses.txt                          # Datos de ejemplo
-│   └── desintereses.txt                       # Datos de ejemplo
+│   ├── intereses.txt                      # Datos de ejemplo
+│   └── desintereses.txt                   # Datos de ejemplo
 ├── lib/
-│   └── jade.jar                               # (añadir manualmente)
-├── .classpath                                 # Configuración Eclipse
-├── .project                                   # Proyecto Eclipse
-├── CareerAdvisorMAS.launch                    # Configuración de ejecución
+│   └── jade.jar                           # (añadir manualmente)
+├── .classpath / .project                  # Configuración Eclipse
+├── CareerAdvisorMAS.launch                # Run config Eclipse
+├── ejecutar.bat                           # Lanzador Windows (doble clic)
+├── ejecutar.sh                            # Lanzador macOS/Linux (doble clic)
 └── README.md
 ```
 
@@ -256,16 +286,11 @@ CareerAdvisorMAS/
 
 ## Declaración de IA
 
-Este proyecto ha utilizado herramientas de inteligencia artificial (Claude Sonnet, Anthropic) como apoyo en las siguientes tareas:
+Este proyecto ha utilizado **Claude (Anthropic)** como herramienta de apoyo en:
 
-- **Generación de código base**: Los ficheros Java han sido generados con asistencia de IA a partir de la descripción del sistema y los requisitos de la práctica.
-- **Revisión y depuración**: La IA ha ayudado a identificar patrones de diseño adecuados para JADE (comportamientos, filtros de mensajes, registro en DF).
-- **Documentación**: El README ha sido redactado con apoyo de IA.
+- **Generación de código base**: los ficheros Java han sido generados con asistencia de IA a partir del enunciado de la práctica y los requisitos del sistema.
+- **Diseño de arquitectura**: la IA propuso y argumentó el uso del protocolo FIPA Contract-Net como solución genuinamente multiagente frente a una arquitectura pipeline trivial.
+- **Revisión de errores de compilación**: la IA detectó llamadas incorrectas a la API de JADE (`setOntology` → `addOntologies` en `ServiceDescription`).
+- **Documentación**: este README ha sido redactado con apoyo de IA.
 
-Todo el código ha sido revisado, comprendido y adaptado por el equipo humano. La IA se ha usado como herramienta de apoyo, no como sustituto del aprendizaje.
-
----
-
-## Modo de Trabajo
-
-El trabajo se ha realizado principalmente en llamada de manera simultánea. Así se han detallado los objetivos del sistema y el flujo de agentes. Una vez definidos, se ha usado Claude para generar el código del proyecto y se ha revisado su funcionalidad en grupo. Por último, se ha procedido a preparar la presentación.
+Todo el código ha sido revisado, comprendido y validado por el equipo. La IA se ha usado como herramienta de productividad, no como sustituto del aprendizaje ni del criterio de diseño.

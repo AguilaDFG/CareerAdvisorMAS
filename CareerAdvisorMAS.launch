@@ -6,8 +6,12 @@
     <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
         <listEntry value="1"/>
     </listAttribute>
-    <stringAttribute key="org.eclipse.jdt.launching.MAIN_TYPE" value="es.upm.careeradvisor.MainLauncher"/>
-    <stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="CareerAdvisorMAS"/>
-    <stringAttribute key="org.eclipse.jdt.launching.VM_ARGUMENTS" value="-Xmx512m"/>
-    <stringAttribute key="org.eclipse.jdt.launching.WORKING_DIRECTORY" value="${project_loc}"/>
+    <stringAttribute key="org.eclipse.jdt.launching.MAIN_TYPE"
+                     value="es.upm.careeradvisor.MainLauncher"/>
+    <stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR"
+                     value="CareerAdvisorMAS"/>
+    <stringAttribute key="org.eclipse.jdt.launching.VM_ARGUMENTS"
+                     value="-Xmx512m"/>
+    <stringAttribute key="org.eclipse.jdt.launching.WORKING_DIRECTORY"
+                     value="${project_loc}"/>
 </launchConfiguration>
