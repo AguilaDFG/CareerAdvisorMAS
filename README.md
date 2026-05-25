@@ -299,7 +299,9 @@ El diseño final del sistema, la definición de la arquitectura, la adaptación 
 
 La IA se utilizó como herramienta de apoyo y productividad durante el desarrollo, manteniendo en todo momento supervisión y revisión manual sobre el código y las decisiones técnicas incorporadas al proyecto..
 
-## Modelo de Trabajo 
+---
+
+## Modo de Trabajo
 
 El proyecto se desarrolló de forma colaborativa entre los miembros del grupo, definiendo conjuntamente los objetivos, la arquitectura general y el comportamiento esperado de los agentes..
 
@@ -307,9 +309,3 @@ A lo largo del desarrollo se realizaron pruebas, correcciones y revisiones de fo
 
 
 Las herramientas de IA generativa se utilizaron como apoyo durante tareas de implementación, documentación y depuración, integrando posteriormente el código en el proyecto tras su revisión y adaptación por parte del equipo..
-
----
-
-## Modo de Trabajo
-
-El trabajo se ha desarrollado de manera grupal en llamada. De esta forma se han especificado los objetivos y requisitos de la aplicación. Una vez definidos, se ha utilizado Claude para la generación del código y, por último, se ha corregido dicho código también en llamada.
