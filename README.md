@@ -17,6 +17,7 @@
 5. [Ejecución](#ejecución)
 6. [Datos de ejemplo](#datos-de-ejemplo)
 7. [Declaración de IA](#declaración-de-ia)
+8. .[Modelo de Trabajo](#modelo-de-trabajo)
 
 ---
 
@@ -294,3 +295,8 @@ Este proyecto ha utilizado **Claude (Anthropic)** como herramienta de apoyo en:
 - **Documentación**: este README ha sido redactado con apoyo de IA.
 
 Todo el código ha sido revisado, comprendido y validado por el equipo. La IA se ha usado como herramienta de productividad, no como sustituto del aprendizaje ni del criterio de diseño.
+
+
+## Modelo de Trabajo 
+
+El trabajo se ha desarrollado de manera grupal en llamada. De esta forma se han especificado los objetivos y requisitos de la aplicación. Una vez definidos, se ha utilizado Claude para la generación del código y, por último, se ha corregido dicho código también en llamada.
