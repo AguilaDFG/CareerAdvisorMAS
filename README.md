@@ -1,4 +1,4 @@
-# CareerAdvisor-MAS 🎓
+# CareerAdvisor-MAS
 
 **Sistema multiagente para la recomendación de carreras universitarias basado en intereses personales**
 
@@ -17,7 +17,7 @@
 5. [Ejecución](#ejecución)
 6. [Datos de ejemplo](#datos-de-ejemplo)
 7. [Declaración de IA](#declaración-de-ia)
-8. .[Modelo de Trabajo](#modelo-de-trabajo)
+8. [Modo de trabajo](#modo-de-trabajo)
 
 ---
 
@@ -287,16 +287,29 @@ CareerAdvisorMAS/
 
 ## Declaración de IA
 
-Este proyecto ha utilizado **Claude (Anthropic)** como herramienta de apoyo en:
+Durante el desarrollo del proyecto se utilizaron herramientas de IA generativa (principalmente Claude, de Anthropic) como apoyo técnico para distintas tareas de implementación y documentación.
+La IA se empleó principalmente para:
+ - Apoyo en la implementación de partes del código Java y estructuras base del sistema;
+ - Revisión y depuración de errores relacionados con la API de JADE;
+ - Generación de ejemplos de documentación y mejora de la organización del README;
+ - Discusión de alternativas de diseño para la arquitectura multiagente.
+ 
 
-- **Generación de código base**: los ficheros Java han sido generados con asistencia de IA a partir del enunciado de la práctica y los requisitos del sistema.
-- **Diseño de arquitectura**: la IA propuso y argumentó el uso del protocolo FIPA Contract-Net como solución genuinamente multiagente frente a una arquitectura pipeline trivial.
-- **Revisión de errores de compilación**: la IA detectó llamadas incorrectas a la API de JADE (`setOntology` → `addOntologies` en `ServiceDescription`).
-- **Documentación**: este README ha sido redactado con apoyo de IA.
+El diseño final del sistema, la definición de la arquitectura, la adaptación de los behaviours, la integración entre agentes y la validación del funcionamiento fueron realizados y revisados por el equipo.
 
-Todo el código ha sido revisado, comprendido y validado por el equipo. La IA se ha usado como herramienta de productividad, no como sustituto del aprendizaje ni del criterio de diseño.
-
+La IA se utilizó como herramienta de apoyo y productividad durante el desarrollo, manteniendo en todo momento supervisión y revisión manual sobre el código y las decisiones técnicas incorporadas al proyecto..
 
 ## Modelo de Trabajo 
+
+El proyecto se desarrolló de forma colaborativa entre los miembros del grupo, definiendo conjuntamente los objetivos, la arquitectura general y el comportamiento esperado de los agentes..
+
+A lo largo del desarrollo se realizaron pruebas, correcciones y revisiones de forma iterativa, validando el funcionamiento del sistema multiagente sobre JADE y ajustando la comunicación entre agentes, behaviours y servicios registrados en el DF.
+
+
+Las herramientas de IA generativa se utilizaron como apoyo durante tareas de implementación, documentación y depuración, integrando posteriormente el código en el proyecto tras su revisión y adaptación por parte del equipo..
+
+---
+
+## Modo de Trabajo
 
 El trabajo se ha desarrollado de manera grupal en llamada. De esta forma se han especificado los objetivos y requisitos de la aplicación. Una vez definidos, se ha utilizado Claude para la generación del código y, por último, se ha corregido dicho código también en llamada.

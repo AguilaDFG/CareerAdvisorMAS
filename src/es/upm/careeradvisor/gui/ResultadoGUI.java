@@ -72,7 +72,7 @@ public class ResultadoGUI extends JFrame {
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(C_BG);
         root.add(buildHeader(data), BorderLayout.NORTH);
-        root.add(buildBody(data.careers), BorderLayout.CENTER);
+        root.add(buildBody(data), BorderLayout.CENTER);
         root.add(buildFooter(), BorderLayout.SOUTH);
 
         add(root);
@@ -139,11 +139,17 @@ public class ResultadoGUI extends JFrame {
     }
 
     // ── Cuerpo ────────────────────────────────────────────────────────────
-    private JScrollPane buildBody(List<CarreraResultado> careers) {
+    private JScrollPane buildBody(ResultadoParsed data) {
+        List<CarreraResultado> careers = data.careers;
+
         JPanel body = new JPanel();
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
         body.setBackground(C_BG);
         body.setBorder(new EmptyBorder(14, 18, 14, 18));
+
+        // ── Banner dominio ganador ──────────────────────────────────────
+        body.add(buildWinnerBanner(data.winnerDomain));
+        body.add(Box.createVerticalStrut(14));
 
         JLabel sectionLabel = new JLabel("🏆  Ranking global de carreras recomendadas");
         sectionLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
@@ -164,6 +170,107 @@ public class ResultadoGUI extends JFrame {
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getVerticalScrollBar().setUnitIncrement(16);
         return scroll;
+    }
+
+    // ── Banner dominio ganador ────────────────────────────────────────────
+    /**
+     * Muestra un banner destacado con el dominio ganador del Contract-Net.
+     * El AgenteCoordinador eligió este dominio porque su mejor carrera
+     * obtuvo el mayor score global entre todos los agentes KB.
+     */
+    private JPanel buildWinnerBanner(String winnerDomainAgent) {
+        String key        = extraerDominioKey(winnerDomainAgent);
+        Color  domColor   = DOMAIN_COLORS.getOrDefault(key, C_ACCENT);
+        String domDisplay = key.substring(0, 1).toUpperCase() + key.substring(1);
+
+        // Emoji y descripción según el dominio
+        String[] info = domainInfo(key);
+        String emoji  = info[0];
+        String desc   = info[1];
+
+        JPanel banner = new JPanel(new BorderLayout(14, 0)) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                    RenderingHints.VALUE_ANTIALIAS_ON);
+                // Sombra
+                g2.setColor(new Color(0, 0, 0, 18));
+                g2.fillRoundRect(3, 5, getWidth() - 4, getHeight() - 4, 14, 14);
+                // Fondo con gradiente horizontal
+                GradientPaint gp = new GradientPaint(
+                    0, 0, domColor,
+                    getWidth(), 0, domColor.darker());
+                g2.setPaint(gp);
+                g2.fillRoundRect(0, 0, getWidth() - 4, getHeight() - 4, 14, 14);
+                g2.dispose();
+            }
+        };
+        banner.setOpaque(false);
+        banner.setBorder(new EmptyBorder(12, 16, 12, 16));
+        banner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
+
+        // Icono / emoji izquierda
+        JLabel iconLbl = new JLabel(emoji, SwingConstants.CENTER);
+        iconLbl.setFont(new Font("SansSerif", Font.PLAIN, 30));
+        iconLbl.setPreferredSize(new Dimension(44, 44));
+        banner.add(iconLbl, BorderLayout.WEST);
+
+        // Textos centrales
+        JPanel txt = new JPanel(new GridLayout(2, 1, 0, 3));
+        txt.setOpaque(false);
+
+        JLabel titleLbl = new JLabel(
+            "★  Mayor afinidad detectada: dominio de " + domDisplay);
+        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 14));
+        titleLbl.setForeground(Color.WHITE);
+
+        JLabel descLbl = new JLabel(desc);
+        descLbl.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        descLbl.setForeground(new Color(220, 235, 255));
+
+        txt.add(titleLbl);
+        txt.add(descLbl);
+        banner.add(txt, BorderLayout.CENTER);
+
+        // Badge "KB ganador" derecha
+        JLabel badge = new JLabel("KB ganador") {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                    RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(255, 255, 255, 45));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        badge.setFont(new Font("SansSerif", Font.BOLD, 11));
+        badge.setForeground(Color.WHITE);
+        badge.setBorder(new EmptyBorder(4, 10, 4, 10));
+        badge.setHorizontalAlignment(SwingConstants.CENTER);
+        badge.setOpaque(false);
+        badge.setPreferredSize(new Dimension(88, 30));
+        banner.add(badge, BorderLayout.EAST);
+
+        return banner;
+    }
+
+    /** Devuelve {emoji, descripción} para cada dominio. */
+    private String[] domainInfo(String key) {
+        switch (key) {
+            case "tecnologia":  return new String[]{"💻",
+                "Tus intereses encajan mejor con carreras tecnológicas e ingenierías."};
+            case "ciencias":    return new String[]{"🔬",
+                "Tus intereses encajan mejor con carreras científicas y experimentales."};
+            case "humanidades": return new String[]{"📖",
+                "Tus intereses encajan mejor con carreras de humanidades y ciencias sociales."};
+            case "salud":       return new String[]{"🏥",
+                "Tus intereses encajan mejor con carreras del ámbito de la salud."};
+            case "arte":        return new String[]{"🎨",
+                "Tus intereses encajan mejor con carreras artísticas y creativas."};
+            default:            return new String[]{"🎓",
+                "Dominio con mayor afinidad según el análisis multiagente."};
+        }
     }
 
     private JPanel buildCard(CarreraResultado c, int pos, double maxScore) {

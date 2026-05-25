@@ -130,13 +130,22 @@ public class AgenteVisualizacion extends Agent {
 
         // ── Consola ───────────────────────────────────────────────────
         private void mostrarConsola(ResultadoParsed r) {
+            // Extraer clave corta del dominio ganador (p.ej. "tecnologia")
+            String wKey = r.winnerDomain == null ? "" : r.winnerDomain.toLowerCase();
+            if (wKey.contains("_")) wKey = wKey.substring(wKey.lastIndexOf('_') + 1);
+            String wDisplay = wKey.isEmpty() ? "desconocido"
+                : wKey.substring(0, 1).toUpperCase() + wKey.substring(1);
+
             System.out.println();
             System.out.println("╔══════════════════════════════════════════════════════════╗");
             System.out.println("║        CARREERADVISOR MAS — RANKING GLOBAL               ║");
             System.out.println("╠══════════════════════════════════════════════════════════╣");
             System.out.println("║ Intereses:    " + trunc(r.intereses, 45));
-            if (!r.desintereses.isEmpty())
+            if (r.desintereses != null && !r.desintereses.isEmpty())
                 System.out.println("║ Desintereses: " + trunc(r.desintereses, 45));
+            System.out.println("╠══════════════════════════════════════════════════════════╣");
+            System.out.println("║  ★ MAYOR AFINIDAD: dominio de " + wDisplay
+                + " (KB ganador del Contract-Net)");
             System.out.println("╠══════════════════════════════════════════════════════════╣");
             String[] med = {"🥇","🥈","🥉"," 4."," 5."," 6."," 7."," 8."," 9.","10."};
             for (int i = 0; i < r.careers.size(); i++) {
